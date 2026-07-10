@@ -1,5 +1,5 @@
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
 use log::{debug, info};
 
@@ -7,7 +7,8 @@ use crate::activity::Activity;
 use crate::error::Error;
 use crate::external_assets::ExternalAssetsResolver;
 use crate::gateway::{run_gateway, GatewayState};
-use crate::presence::{build_presence_update, PresenceStatus};
+use crate::payload::build_presence_update;
+use crate::presence::PresenceStatus;
 use crate::status::ActivityStatus;
 
 /// The entry point for Discord Social RPC.
@@ -41,6 +42,7 @@ pub struct DiscordSocialRpc {
 
 impl DiscordSocialRpc {
     /// Create a new DiscordSocialRpc instance with the given Discord Application ID.
+    /// Creates an internal tokio runtime.
     pub fn new(app_id: &str) -> Result<Self, Error> {
         let app_id = app_id.to_string();
         let runtime = Runtime::new().map_err(|e| Error::Runtime(e.to_string()))?;
@@ -49,6 +51,15 @@ impl DiscordSocialRpc {
             app_id,
             runtime: Arc::new(runtime),
         })
+    }
+
+    /// Create a new DiscordSocialRpc instance with an existing external tokio runtime.
+    /// Useful when embedding in a server (like axum) to avoid multiple runtimes.
+    pub fn with_runtime(app_id: &str, runtime: Arc<Runtime>) -> Self {
+        Self {
+            app_id: app_id.to_string(),
+            runtime,
+        }
     }
 
     /// Validate the OAuth2 token format and create a new RPC client.
@@ -79,7 +90,7 @@ impl DiscordSocialRpc {
 
         Ok(DiscordRpcClient {
             app_id: self.app_id.clone(),
-            token,
+            token: Mutex::new(token),
             runtime: self.runtime.clone(),
             state,
             current_activity: std::sync::Mutex::new(None),
@@ -94,7 +105,7 @@ impl DiscordSocialRpc {
 /// Use the builder methods to configure activity, then call `start_activity()`.
 pub struct DiscordRpcClient {
     app_id: String,
-    token: String,
+    token: Mutex<String>,
     runtime: Arc<Runtime>,
     state: Arc<GatewayState>,
     current_activity: std::sync::Mutex<Option<Activity>>,
@@ -108,11 +119,13 @@ impl DiscordRpcClient {
     /// activity is sent immediately via the Gateway. Otherwise it is stored
     /// and will be sent when `start_activity()` is called.
     pub fn set_activity(&self, activity: Activity) -> Result<(), Error> {
+        let token = self.token.lock().unwrap().clone();
+
         // Resolve external images if needed
         let resolved_activity = resolve_activity_images(
             &activity,
             &self.app_id,
-            &self.token,
+            &token,
             &self.asset_resolver,
         );
 
@@ -143,10 +156,10 @@ impl DiscordRpcClient {
     pub fn start_activity(&self) -> Result<(), Error> {
         let state = self.state.clone();
         let app_id = self.app_id.clone();
-        let token = self.token.clone();
+        let token = self.token.lock().unwrap().clone();
 
         // Set initial status
-        self.state.set_status(ActivityStatus::Disconnected);
+        self.state.set_sync(ActivityStatus::Disconnected);
 
         // Launch the gateway task
         self.runtime.spawn(async move {
@@ -169,10 +182,11 @@ impl DiscordRpcClient {
                                     current.clone()
                                 };
                                 if let Some(act) = activity {
+                                    let token = self.token.lock().unwrap().clone();
                                     let resolved = resolve_activity_images(
                                         &act,
                                         &self.app_id,
-                                        &self.token,
+                                        &token,
                                         &self.asset_resolver,
                                     );
                                     let presence_json =
@@ -221,6 +235,16 @@ impl DiscordRpcClient {
             .block_on(async { self.state.user_name.lock().await.clone() })
     }
 
+    /// Update the OAuth2 token used by this client.
+    /// Useful for token refresh without needing to recreate the client.
+    /// The gateway task already has its own copy; this ensures future
+    /// identify/resume attempts use the new token.
+    pub fn set_token(&self, new_token: &str) {
+        let mut token = self.token.lock().unwrap();
+        *token = new_token.to_string();
+        info!("client: token updated");
+    }
+
     /// Stop displaying the activity and disconnect from Discord Gateway.
     ///
     /// This sends an empty presence update (clears the activity) and
@@ -243,7 +267,7 @@ impl DiscordRpcClient {
 
         // Reset state
         self.state.ready.store(false, Ordering::SeqCst);
-        self.state.set_status(ActivityStatus::Stopped);
+        self.state.set_sync(ActivityStatus::Stopped);
 
         // Clear activity
         {
