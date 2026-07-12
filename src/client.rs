@@ -53,15 +53,6 @@ impl DiscordSocialRpc {
         })
     }
 
-    /// Create a new DiscordSocialRpc instance with an existing external tokio runtime.
-    /// Useful when embedding in a server (like axum) to avoid multiple runtimes.
-    pub fn with_runtime(app_id: &str, runtime: Arc<Runtime>) -> Self {
-        Self {
-            app_id: app_id.to_string(),
-            runtime,
-        }
-    }
-
     /// Validate the OAuth2 token format and create a new RPC client.
     ///
     /// This validates the token format but does NOT connect to Discord Gateway yet.
@@ -113,6 +104,27 @@ pub struct DiscordRpcClient {
 }
 
 impl DiscordRpcClient {
+    /// Build and send a presence update for a resolved activity (no re-resolution).
+    fn send_activity_inner(&self, activity: &Activity) {
+        let presence_json = build_presence_update(PresenceStatus::Online, &[activity.clone()]);
+        self.state.send_presence(presence_json.to_string());
+    }
+
+    /// Store the activity and optionally send it if the gateway is ready.
+    fn store_and_send_activity(&self, activity: Activity) {
+        {
+            let mut current = self.current_activity.lock().unwrap();
+            *current = Some(activity.clone());
+        }
+
+        if self.state.ready.load(Ordering::SeqCst) {
+            debug!("client: sending presence update via set_activity");
+            self.send_activity_inner(&activity);
+        } else {
+            debug!("client: activity stored (not yet connected)");
+        }
+    }
+
     /// Configure the activity to display on Discord.
     ///
     /// If the client is already connected (after `start_activity()`), the
@@ -121,7 +133,7 @@ impl DiscordRpcClient {
     pub fn set_activity(&self, activity: Activity) -> Result<(), Error> {
         let token = self.token.lock().unwrap().clone();
 
-        // Resolve external images if needed
+        // Resolve external images now, so we don't need to re-resolve later
         let resolved_activity = resolve_activity_images(
             &activity,
             &self.app_id,
@@ -129,23 +141,7 @@ impl DiscordRpcClient {
             &self.asset_resolver,
         );
 
-        // Store the activity
-        {
-            let mut current = self.current_activity.lock().unwrap();
-            *current = Some(resolved_activity.clone());
-        }
-
-        // If we're already connected, send the presence update immediately
-        if self.state.ready.load(Ordering::SeqCst) {
-            let resolved_presence =
-                build_presence_update(PresenceStatus::Online, &[resolved_activity]);
-            let payload = resolved_presence.to_string();
-            debug!("client: sending presence update via set_activity");
-            self.state.send_presence(payload);
-        } else {
-            debug!("client: activity stored (not yet connected)");
-        }
-
+        self.store_and_send_activity(resolved_activity);
         Ok(())
     }
 
@@ -182,16 +178,7 @@ impl DiscordRpcClient {
                                     current.clone()
                                 };
                                 if let Some(act) = activity {
-                                    let token = self.token.lock().unwrap().clone();
-                                    let resolved = resolve_activity_images(
-                                        &act,
-                                        &self.app_id,
-                                        &token,
-                                        &self.asset_resolver,
-                                    );
-                                    let presence_json =
-                                        build_presence_update(PresenceStatus::Online, &[resolved]);
-                                    self.state.send_presence(presence_json.to_string());
+                                    self.send_activity_inner(&act);
                                 }
                                 return Ok(());
                             }
@@ -280,6 +267,25 @@ impl DiscordRpcClient {
     }
 }
 
+/// Resolve a single image field if it represents an external URL.
+fn resolve_single_image(
+    image: &mut Option<String>,
+    external: &mut bool,
+    resolver: &ExternalAssetsResolver,
+    app_id: &str,
+    token: &str,
+) {
+    if !*external {
+        return;
+    }
+    if let Some(url) = image {
+        if let Some(resolved_url) = resolver.resolve(url, app_id, token) {
+            *image = Some(resolved_url);
+        }
+    }
+    *external = false;
+}
+
 /// Resolve any external image URLs in the activity assets.
 fn resolve_activity_images(
     activity: &Activity,
@@ -290,23 +296,20 @@ fn resolve_activity_images(
     let mut resolved = activity.clone();
 
     if let Some(assets) = resolved.assets.as_mut() {
-        if assets.large_image_external {
-            if let Some(url) = &assets.large_image {
-                if let Some(resolved_url) = resolver.resolve(url, app_id, token) {
-                    assets.large_image = Some(resolved_url);
-                }
-                assets.large_image_external = false;
-            }
-        }
-
-        if assets.small_image_external {
-            if let Some(url) = &assets.small_image {
-                if let Some(resolved_url) = resolver.resolve(url, app_id, token) {
-                    assets.small_image = Some(resolved_url);
-                }
-                assets.small_image_external = false;
-            }
-        }
+        resolve_single_image(
+            &mut assets.large_image,
+            &mut assets.large_image_external,
+            resolver,
+            app_id,
+            token,
+        );
+        resolve_single_image(
+            &mut assets.small_image,
+            &mut assets.small_image_external,
+            resolver,
+            app_id,
+            token,
+        );
     }
 
     resolved
