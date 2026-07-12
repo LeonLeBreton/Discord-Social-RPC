@@ -4,8 +4,8 @@ use log::warn;
 
 const EXTERNAL_ASSETS_URL: &str =
     "https://discord.com/api/v9/applications/{}/external-assets";
-const CACHE_MAX_SIZE: usize = 128;
-const CACHE_EVICT_BATCH: usize = 10;
+const CACHE_CAPACITY: usize = 4096;
+const CACHE_EVICT_BATCH: usize = 512;
 
 /// Resolves external image URLs to Discord's `mp:` format.
 ///
@@ -19,7 +19,7 @@ impl ExternalAssetsResolver {
     pub fn new() -> Self {
         Self {
             cache: Mutex::new(HashMap::new()),
-            insert_order: Mutex::new(Vec::with_capacity(CACHE_MAX_SIZE)),
+            insert_order: Mutex::new(Vec::with_capacity(CACHE_CAPACITY)),
         }
     }
 
@@ -109,8 +109,8 @@ impl ExternalAssetsResolver {
                 }
             }
 
-            // Evict oldest entries when cache exceeds max size
-            if cache.len() > CACHE_MAX_SIZE {
+            // Evict oldest entries when cache exceeds capacity
+            if cache.len() > CACHE_CAPACITY {
                 if let Ok(mut order) = self.insert_order.lock() {
                     let to_evict: Vec<String> = order.drain(..CACHE_EVICT_BATCH).collect();
                     for k in &to_evict {
