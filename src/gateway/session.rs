@@ -181,13 +181,13 @@ async fn send_identify_or_resume(
         let sid = state.session_id.lock().await.clone().unwrap_or_default();
         let seq = state.last_seq.load(Ordering::SeqCst);
         let frame = build_resume_frame(token, &sid, seq);
-        if write.send(Message::Text(frame.to_string())).await.is_err() {
+        if write.send(Message::Text(frame.to_string().into())).await.is_err() {
             return Err(SessionResult::Reconnect);
         }
         info!("gateway: RESUME sent (sid={})", &sid[..sid.len().min(8)]);
     } else {
         let frame = build_identify_frame(app_id, token);
-        if write.send(Message::Text(frame.to_string())).await.is_err() {
+        if write.send(Message::Text(frame.to_string().into())).await.is_err() {
             return Err(SessionResult::Reconnect);
         }
         info!("gateway: IDENTIFY sent");
@@ -203,7 +203,7 @@ async fn send_heartbeat(
 ) -> Result<(), SessionResult> {
     let seq = state.last_seq.load(Ordering::SeqCst);
     if write
-        .send(Message::Text(build_heartbeat_frame(Some(seq)).to_string()))
+        .send(Message::Text(build_heartbeat_frame(Some(seq)).to_string().into()))
         .await
         .is_err()
     {
@@ -266,7 +266,7 @@ async fn handle_ws_message(
 /// When `before_hello` is true, returns `SessionResult` directly.
 /// When `before_hello` is false, returns `Result<(), SessionResult>` for use in handle_ws_message.
 async fn handle_close_frame(
-    frame: Option<CloseFrame<'static>>,
+    frame: Option<CloseFrame>,
     before_hello: bool,
     state: &Arc<GatewayState>,
 ) -> SessionResult {
@@ -299,7 +299,7 @@ async fn handle_presence(
 ) -> Result<(), SessionResult> {
     match r {
         Ok(p) => {
-            if write.send(Message::Text(p)).await.is_err() {
+            if write.send(Message::Text(p.into())).await.is_err() {
                 Err(SessionResult::Reconnect)
             } else {
                 Ok(())
