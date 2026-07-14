@@ -11,85 +11,6 @@ use crate::payload::build_presence_update;
 use crate::presence::PresenceStatus;
 use crate::status::ActivityStatus;
 
-/// The entry point for Discord Social RPC.
-///
-/// This factory creates the internal tokio runtime and provides
-/// methods to create rich presence clients.
-///
-/// # Example
-///
-/// ```no_run
-/// use discord_social_rpc::{DiscordSocialRpc, Activity, ActivityType};
-///
-/// let client = DiscordSocialRpc::new("your_app_id").unwrap();
-/// let rpc = client.create_new_client("your_oauth2_token").unwrap();
-///
-/// rpc.set_activity(
-///     Activity::new()
-///         .state("Playing Rust")
-///         .details("Building a library")
-///         .activity_type(ActivityType::Listening)
-/// ).unwrap();
-///
-/// rpc.start_activity().unwrap();
-/// println!("{:?}", rpc.activity_status());
-/// rpc.stop_activity().unwrap();
-/// ```
-pub struct DiscordSocialRpc {
-    app_id: String,
-    runtime: Arc<Runtime>,
-}
-
-impl DiscordSocialRpc {
-    /// Create a new DiscordSocialRpc instance with the given Discord Application ID.
-    /// Creates an internal tokio runtime.
-    pub fn new(app_id: &str) -> Result<Self, Error> {
-        let app_id = app_id.to_string();
-        let runtime = Runtime::new().map_err(|e| Error::Runtime(e.to_string()))?;
-
-        Ok(Self {
-            app_id,
-            runtime: Arc::new(runtime),
-        })
-    }
-
-    /// Validate the OAuth2 token format and create a new RPC client.
-    ///
-    /// This validates the token format but does NOT connect to Discord Gateway yet.
-    /// Call `start_activity()` to establish the WebSocket connection and display activity.
-    pub fn create_new_client(&self, oauth2_token: &str) -> Result<DiscordRpcClient, Error> {
-        let token = oauth2_token.trim().to_string();
-
-        if token.is_empty() || token.contains(' ') {
-            return Err(Error::InvalidToken(
-                "Token is empty or contains whitespace".to_string(),
-            ));
-        }
-
-        if token.len() < 20 {
-            return Err(Error::InvalidToken(
-                "Token is too short to be a valid OAuth2 token".to_string(),
-            ));
-        }
-
-        info!(
-            "DiscordSocialRpc: created client for app_id={}",
-            self.app_id
-        );
-
-        let state = GatewayState::new();
-
-        Ok(DiscordRpcClient {
-            app_id: self.app_id.clone(),
-            token: Mutex::new(token),
-            runtime: self.runtime.clone(),
-            state,
-            current_activity: std::sync::Mutex::new(None),
-            asset_resolver: ExternalAssetsResolver::new(),
-        })
-    }
-}
-
 /// A client that manages a Discord Rich Presence connection.
 ///
 /// Created via [`DiscordSocialRpc::create_new_client`].
@@ -104,6 +25,25 @@ pub struct DiscordRpcClient {
 }
 
 impl DiscordRpcClient {
+    /// Create a new DiscordRpcClient (internal constructor).
+    pub(crate) fn new(
+        app_id: String,
+        token: String,
+        runtime: Arc<Runtime>,
+        state: Arc<GatewayState>,
+        current_activity: std::sync::Mutex<Option<Activity>>,
+        asset_resolver: ExternalAssetsResolver,
+    ) -> Self {
+        Self {
+            app_id,
+            token: Mutex::new(token),
+            runtime,
+            state,
+            current_activity,
+            asset_resolver,
+        }
+    }
+
     /// Build and send a presence update for a resolved activity (no re-resolution).
     fn send_activity_inner(&self, activity: &Activity) {
         let presence_json = build_presence_update(PresenceStatus::Online, &[activity.clone()]);
