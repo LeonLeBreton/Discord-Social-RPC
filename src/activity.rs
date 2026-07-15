@@ -18,10 +18,10 @@ impl ActivityType {
 /// Timestamps for an activity (start and/or end).
 ///
 /// Times are Unix epoch timestamps in milliseconds.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Copy)]
 pub struct Timestamps {
-    pub start: Option<i64>,
-    pub end: Option<i64>,
+    pub(crate) start: Option<i64>,
+    pub(crate) end: Option<i64>,
 }
 
 impl Timestamps {
@@ -30,16 +30,24 @@ impl Timestamps {
     }
 
     /// Set the start timestamp (Unix epoch milliseconds).
-    pub fn start(mut self, ms: i64) -> Self {
+    pub fn set_start(mut self, ms: i64) -> Self {
         self.start = Some(ms);
         self
     }
 
     /// Set the end timestamp (Unix epoch milliseconds).
-    pub fn end(mut self, ms: i64) -> Self {
+    pub fn set_end(mut self, ms: i64) -> Self {
         self.end = Some(ms);
         self
     }
+    
+    pub fn start(&self) -> i64 {
+        self.start.unwrap_or_default()
+    }
+    
+    pub fn end(&self) -> i64 {
+        self.end.unwrap_or_default()
+    }   
 }
 
 /// Assets (images) for a Discord activity.
@@ -49,10 +57,10 @@ impl Timestamps {
 /// - **External URL**: Use `large_image("https://...")` — resolved automatically
 #[derive(Debug, Clone, Default)]
 pub struct Assets {
-    pub large_image: Option<String>,
-    pub large_text: Option<String>,
-    pub small_image: Option<String>,
-    pub small_text: Option<String>,
+    pub(crate) large_image: Option<String>,
+    pub(crate) large_text: Option<String>,
+    pub(crate) small_image: Option<String>,
+    pub(crate) small_text: Option<String>,
     pub(crate) large_image_external: bool,
     pub(crate) small_image_external: bool,
 }
@@ -64,29 +72,45 @@ impl Assets {
 
     /// Set the large image. If the key starts with `mp:` it's treated as
     /// a pre-registered asset; otherwise it's resolved as an external URL.
-    pub fn large_image(mut self, key: &str) -> Self {
+    pub fn set_large_image(mut self, key: &str) -> Self {
         self.large_image = Some(key.to_string());
         self.large_image_external = !key.starts_with("mp:");
         self
     }
 
     /// Set the text displayed on hover over the large image.
-    pub fn large_text(mut self, text: &str) -> Self {
+    pub fn set_large_text(mut self, text: &str) -> Self {
         self.large_text = Some(text.to_string());
         self
     }
 
     /// Set the small image. See `large_image` for URL handling.
-    pub fn small_image(mut self, key: &str) -> Self {
+    pub fn set_small_image(mut self, key: &str) -> Self {
         self.small_image = Some(key.to_string());
         self.small_image_external = !key.starts_with("mp:");
         self
     }
 
     /// Set the text displayed on hover over the small image.
-    pub fn small_text(mut self, text: &str) -> Self {
+    pub fn set_small_text(mut self, text: &str) -> Self {
         self.small_text = Some(text.to_string());
         self
+    }
+
+    pub fn large_image(&self) -> String {
+        self.large_image.clone().unwrap_or_default()
+    }
+
+    pub fn large_text(&self) -> String {
+        self.large_text.clone().unwrap_or_default()
+    }
+
+    pub fn small_image(&self) -> String {
+        self.small_image.clone().unwrap_or_default()
+    }
+
+    pub fn small_text(&self) -> String {
+        self.small_text.clone().unwrap_or_default()
     }
 }
 
@@ -120,38 +144,62 @@ impl Activity {
     }
 
     /// Set the activity name (top line on Discord).
-    pub fn name(mut self, name: &str) -> Self {
+    pub fn set_name(mut self, name: &str) -> Self {
         self.name = name.to_string();
         self
     }
 
     /// Set the activity type.
-    pub fn activity_type(mut self, t: ActivityType) -> Self {
+    pub fn set_activity_type(mut self, t: ActivityType) -> Self {
         self.activity_type = t;
         self
     }
 
     /// Set the state string (second line on Discord).
-    pub fn state(mut self, state: &str) -> Self {
+    pub fn set_state(mut self, state: &str) -> Self {
         self.state = Some(state.to_string());
         self
     }
 
     /// Set the details string (first line below the name).
-    pub fn details(mut self, details: &str) -> Self {
+    pub fn set_details(mut self, details: &str) -> Self {
         self.details = Some(details.to_string());
         self
     }
 
     /// Set the activity assets (images).
-    pub fn assets(mut self, assets: Assets) -> Self {
+    pub fn set_assets(mut self, assets: Assets) -> Self {
         self.assets = Some(assets);
         self
     }
 
     /// Set the activity timestamps.
-    pub fn timestamps(mut self, ts: Timestamps) -> Self {
+    pub fn set_timestamps(mut self, ts: Timestamps) -> Self {
         self.timestamps = Some(ts);
         self
+    }
+    
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    
+    pub fn activity_type(&self) -> ActivityType {
+        self.activity_type
+    }
+    
+    pub fn state(&self) -> String {
+        self.state.clone().unwrap_or_default()
+    }
+    
+    pub fn details(&self) -> String {
+        self.details.clone().unwrap_or_default()
+    }
+    
+    pub fn assets(&self) -> Assets {
+        self.assets.clone().unwrap_or_default()
+    }
+    
+    pub fn timestamps(&self) -> Timestamps {
+        self.timestamps.unwrap_or_default()
     }
 }
