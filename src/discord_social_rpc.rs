@@ -8,10 +8,6 @@ use crate::external_assets::ExternalAssetsResolver;
 use crate::gateway::GatewayState;
 use crate::utils::{self, TokenRefreshResponse, CodeExchangeResponse};
 
-// ============================================================
-// DiscordSocialRpc (déplacé depuis client.rs)
-// ============================================================
-
 /// The entry point for Discord Social RPC.
 ///
 /// This factory creates the internal tokio runtime and provides
@@ -71,10 +67,6 @@ impl DiscordSocialRpc {
         ))
     }
 }
-
-// ============================================================
-// DiscordSocialRpcAdmin (nouveau)
-// ============================================================
 
 /// Admin interface for Discord OAuth2 operations.
 ///

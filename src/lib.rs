@@ -15,10 +15,10 @@
 //!
 //! rpc.set_activity(
 //!     Activity::new()
-//!         .state("Playing Rust")
-//!         .details("Building a library")
-//!         .activity_type(ActivityType::Listening)
-//!         .assets(Assets::new().large_image("mp:rust_logo"))
+//!         .set_state("Playing Rust")
+//!         .set_details("Building a library")
+//!         .set_activity_type(ActivityType::Listening)
+//!         .set_assets(Assets::new().large_image("mp:rust_logo"))
 //! ).unwrap();
 //!
 //! rpc.start_activity().unwrap();
