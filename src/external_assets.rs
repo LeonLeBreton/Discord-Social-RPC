@@ -82,9 +82,10 @@ impl ExternalAssetsResolver {
 
         if !status.is_success() || response_text.is_empty() {
             warn!(
-                "external-assets: HTTP {} for {}",
+                "external-assets: HTTP {} for {} with response: {}",
                 status,
-                &image_url[..60.min(image_url.len())]
+                &image_url,
+                &response_text
             );
             return None;
         }

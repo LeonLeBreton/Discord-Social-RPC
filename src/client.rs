@@ -81,6 +81,7 @@ impl DiscordRpcClient {
             &self.asset_resolver,
         );
 
+        debug!("Resolved large image : Large : {:?} Small : {:?}", resolved_activity.assets().large_image(), resolved_activity.assets().small_image());
         self.store_and_send_activity(resolved_activity);
         Ok(())
     }
