@@ -50,6 +50,32 @@ impl DiscordRpcClient {
         self.state.send_presence(presence_json.to_string());
     }
 
+    /// Check if an activity is "empty" (no meaningful content).
+    /// An empty activity has no name (or default name), no state, no details,
+    /// no assets, and no timestamps.
+    fn is_activity_empty(activity: &Activity) -> bool {
+        activity.name.is_empty()
+            && activity.state.is_none()
+            && activity.details.is_none()
+            && activity.assets.is_none()
+            && activity.timestamps.is_none()
+    }
+
+    /// Clear the current activity by sending an empty presence update.
+    /// The client stays connected but nothing is displayed on Discord.
+    fn clear_activity(&self) {
+        debug!("client: clearing activity (sending empty presence)");
+        {
+            let mut current = self.current_activity.lock().unwrap();
+            *current = None;
+        }
+
+        if self.state.ready.load(Ordering::SeqCst) {
+            let clear_presence = build_presence_update(PresenceStatus::Online, &[]);
+            self.state.send_presence(clear_presence.to_string());
+        }
+    }
+
     /// Store the activity and optionally send it if the gateway is ready.
     fn store_and_send_activity(&self, activity: Activity) {
         {
@@ -67,10 +93,19 @@ impl DiscordRpcClient {
 
     /// Configure the activity to display on Discord.
     ///
+    /// If the activity is empty (default/new with no fields set), the current
+    /// activity is cleared and nothing is displayed, but the client stays connected.
+    ///
     /// If the client is already connected (after `start_activity()`), the
     /// activity is sent immediately via the Gateway. Otherwise it is stored
     /// and will be sent when `start_activity()` is called.
     pub fn set_activity(&self, activity: Activity) -> Result<(), Error> {
+        // If the activity is empty (default), clear the display
+        if Self::is_activity_empty(&activity) {
+            self.clear_activity();
+            return Ok(());
+        }
+
         let token = self.token.lock().unwrap().clone();
 
         // Resolve external images now, so we don't need to re-resolve later

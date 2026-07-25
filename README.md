@@ -164,7 +164,7 @@ let rpc = client.create_new_client("your_oauth2_token")?;
 
 | Method | Description |
 |--------|-------------|
-| `set_activity(activity)` | Configure the activity. If connected, sends immediately via Gateway. Otherwise stores it until `start_activity()`. |
+| `set_activity(activity)` | Configure the activity. If connected, sends immediately via Gateway. Otherwise stores it until `start_activity()`. **If the activity is empty** (`Activity::new()` / `Activity::default()`), the current activity is cleared — nothing is displayed but the client stays connected. |
 | `start_activity()` | Connect to Discord Gateway, authenticate, and start displaying the activity. Blocks until READY or error. |
 | `stop_activity()` | Clear the activity, disconnect from Gateway, and reset internal state. |
 | `activity_status()` | Get the current connection status (`ActivityStatus`). |
