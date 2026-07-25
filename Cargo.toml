@@ -3,6 +3,11 @@ name = "discord_social_rpc"
 version = "0.1.1"
 edition = "2021"
 description = "A Rust library for Discord Rich Presence using the sdk.social_layer_presence OAuth2 scope"
+license = "MIT"
+keywords = ["discord", "rpc", "rich-presence", "oauth2", "social"]
+categories = ["api-bindings", "network-programming"]
+repository = "https://github.com/LeonLeBreton/Discord-Social-RPC"
+documentation = "https://docs.rs/discord_social_rpc"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -11,6 +16,5 @@ futures-util = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.13", features = ["json", "blocking", "form"] }
-url = "2"
 thiserror = "2"
 log = "0.4"
