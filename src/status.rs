@@ -1,5 +1,5 @@
 /// Represents the current state of the Discord Rich Presence connection.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActivityStatus {
     /// Connected to Discord Gateway and presence is displayed.
     Ok,
@@ -7,7 +7,7 @@ pub enum ActivityStatus {
     /// Not connected to Discord Gateway.
     Disconnected,
     
-    /// OAuth2 token was rejected by Discord.
+    /// `OAuth2` token was rejected by Discord.
     TokenInvalid,
     
     /// A network error occurred (timeout, connection refused).

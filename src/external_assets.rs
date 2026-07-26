@@ -11,7 +11,7 @@ const DEFAULT_CACHE_EVICT_BATCH: usize = 512;
 ///
 /// Uses the `POST /api/v9/applications/{id}/external-assets` endpoint.
 /// Entries are cached with LRU eviction.
-pub(crate) struct ExternalAssetsResolver {
+pub struct ExternalAssetsResolver {
     cache: Mutex<HashMap<String, String>>,
     /// LRU order: front = least recently used, back = most recently used.
     lru_order: Mutex<Vec<String>>,
@@ -50,8 +50,8 @@ impl ExternalAssetsResolver {
             return Some(resolved);
         }
 
-        let external_asset_path = self.fetch_external_asset_path(image_url, app_id, token)?;
-        let result = format!("mp:{}", external_asset_path);
+        let external_asset_path = Self::fetch_external_asset_path(image_url, app_id, token)?;
+        let result = format!("mp:{external_asset_path}");
         self.update_cache(image_url, &result);
         Some(result)
     }
@@ -73,7 +73,6 @@ impl ExternalAssetsResolver {
     }
 
     fn fetch_external_asset_path(
-        &self,
         image_url: &str,
         app_id: &str,
         token: &str,
@@ -84,12 +83,12 @@ impl ExternalAssetsResolver {
 
         let response = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
             .map_err(|e| {
-                warn!("external-assets: request failed: {}", e);
+                warn!("external-assets: request failed: {e}");
             })
             .ok()?;
 
@@ -98,8 +97,7 @@ impl ExternalAssetsResolver {
 
         if !status.is_success() || response_text.is_empty() {
             warn!(
-                "external-assets: HTTP {} for {} with response: {}",
-                status, &image_url, &response_text
+                "external-assets: HTTP {status} for {image_url} with response: {response_text}"
             );
             return None;
         }

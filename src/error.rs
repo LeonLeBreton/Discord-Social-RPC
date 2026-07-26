@@ -3,7 +3,7 @@ use thiserror::Error;
 /// Errors that can occur during Discord RPC operations.
 #[derive(Error, Debug)]
 pub enum Error {
-    /// The OAuth2 token is invalid or was rejected by Discord.
+    /// The `OAuth2` token is invalid or was rejected by Discord.
     #[error("Invalid OAuth2 token: {0}")]
     InvalidToken(String),
 

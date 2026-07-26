@@ -20,8 +20,12 @@ pub struct DiscordSocialRpc {
 }
 
 impl DiscordSocialRpc {
-    /// Create a new DiscordSocialRpc instance with the given Discord Application ID.
+    /// Create a new `DiscordSocialRpc` instance with the given Discord Application ID.
     /// Creates an internal tokio runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tokio runtime cannot be created.
     pub fn new(app_id: &str) -> Result<Self, Error> {
         let app_id = app_id.to_string();
         let runtime = Runtime::new().map_err(|e| Error::Runtime(e.to_string()))?;
@@ -33,6 +37,11 @@ impl DiscordSocialRpc {
         })
     }
 
+    /// Create a new `DiscordSocialRpc` instance with custom cache settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tokio runtime cannot be created.
     pub fn new_custom_cached(app_id: &str, cache_capacity: usize, cache_evict_batch: usize) -> Result<Self, Error> {
         let app_id = app_id.to_string();
         let runtime = Runtime::new().map_err(|e| Error::Runtime(e.to_string()))?;
@@ -44,10 +53,14 @@ impl DiscordSocialRpc {
         })
     }
 
-    /// Validate the OAuth2 token format and create a new RPC client.
+    /// Validate the `OAuth2` token format and create a new RPC client.
     ///
     /// This validates the token format but does NOT connect to Discord Gateway yet.
     /// Call `start_activity()` to establish the WebSocket connection and display activity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the token is empty, contains whitespace, or is too short.
     pub fn create_new_client(&self, oauth2_token: &str) -> Result<DiscordRpcClient, Error> {
         let token = oauth2_token.trim().to_string();
 
@@ -81,10 +94,10 @@ impl DiscordSocialRpc {
     }
 }
 
-/// Admin interface for Discord OAuth2 operations.
+/// Admin interface for Discord `OAuth2` operations.
 ///
 /// Wraps a [`DiscordSocialRpc`] and provides token refresh and code exchange
-/// methods using the client_id and client_secret stored at construction time.
+/// methods using the `client_id` and `client_secret` stored at construction time.
 #[derive(Clone)]
 pub struct DiscordSocialRpcAdmin {
     client_id: String,
@@ -93,8 +106,12 @@ pub struct DiscordSocialRpcAdmin {
 }
 
 impl DiscordSocialRpcAdmin {
-    /// Create a new DiscordSocialRpcAdmin with the given Discord client_id and client_secret.
-    /// Also creates the internal DiscordSocialRpc (which needs client_id = app_id).
+    /// Create a new `DiscordSocialRpcAdmin` with the given Discord `client_id` and `client_secret`.
+    /// Also creates the internal `DiscordSocialRpc` (which needs `client_id` = `app_id`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tokio runtime cannot be created.
     pub fn new(client_id: &str, client_secret: &str) -> Result<Self, Error> {
         let rpc = DiscordSocialRpc::new(client_id)?;
         Ok(Self {
@@ -104,6 +121,11 @@ impl DiscordSocialRpcAdmin {
         })
     }
 
+    /// Create a new `DiscordSocialRpcAdmin` with custom cache settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tokio runtime cannot be created.
     pub fn new_custom_cached(client_id: &str, client_secret: &str, cache_capacity: usize, cache_evict_batch: usize) -> Result<Self, Error> {
         let rpc = DiscordSocialRpc::new_custom_cached(client_id, cache_capacity, cache_evict_batch)?;
         Ok(Self {
@@ -113,7 +135,11 @@ impl DiscordSocialRpcAdmin {
         })
     }
 
-    /// Refresh a user's OAuth2 token (synchronous, uses internal runtime).
+    /// Refresh a user's `OAuth2` token (synchronous, uses internal runtime).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or Discord returns an error.
     pub fn refresh_user_token(&self, refresh_token: &str) -> Result<TokenRefreshResponse, Error> {
         let client_id = self.client_id.clone();
         let client_secret = self.client_secret.clone();
@@ -124,6 +150,10 @@ impl DiscordSocialRpcAdmin {
     }
 
     /// Exchange an authorization code for tokens (synchronous, uses internal runtime).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or Discord returns an error.
     pub fn exchange_code(&self, code: &str, redirect_uri: &str) -> Result<CodeExchangeResponse, Error> {
         let client_id = self.client_id.clone();
         let client_secret = self.client_secret.clone();
@@ -134,9 +164,10 @@ impl DiscordSocialRpcAdmin {
         })
     }
 
-    /// Return a reference to the underlying DiscordSocialRpc for creating clients,
+    /// Return a reference to the underlying `DiscordSocialRpc` for creating clients,
     /// setting activities, etc.
-    pub fn rpc(&self) -> &DiscordSocialRpc {
+    #[must_use]
+    pub const fn rpc(&self) -> &DiscordSocialRpc {
         &self.rpc
     }
 }

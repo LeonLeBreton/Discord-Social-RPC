@@ -1,7 +1,7 @@
 //! # Discord Social RPC
 //!
 //! A Rust library for Discord Rich Presence using the `sdk.social_layer_presence`
-//! OAuth2 scope. Provides a synchronous API — no `async`/`await` needed.
+//! `OAuth2` scope. Provides a synchronous API — no `async`/`await` needed.
 //!
 //! ## Quick Start — Rich Presence
 //!

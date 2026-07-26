@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 
 use super::state::GatewayState;
 
-pub(crate) enum Event {
+pub enum Event {
     Continue,
     Ready,
     Resumed,
@@ -12,7 +12,7 @@ pub(crate) enum Event {
     Reconnect,
 }
 
-pub(crate) async fn handle_event(text: &str, state: &Arc<GatewayState>) -> Event {
+pub async fn handle_event(text: &str, state: &Arc<GatewayState>) -> Event {
     let Ok(json) = serde_json::from_str::<serde_json::Value>(text) else {
         return Event::Continue;
     };

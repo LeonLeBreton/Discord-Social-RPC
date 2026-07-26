@@ -25,8 +25,8 @@ pub struct DiscordRpcClient {
 }
 
 impl DiscordRpcClient {
-    /// Create a new DiscordRpcClient (internal constructor).
-    pub(crate) fn new(
+    /// Create a new `DiscordRpcClient` (internal constructor).
+    pub(crate) const fn new(
         app_id: String,
         token: String,
         runtime: Arc<Runtime>,
@@ -46,14 +46,14 @@ impl DiscordRpcClient {
 
     /// Build and send a presence update for a resolved activity (no re-resolution).
     fn send_activity_inner(&self, activity: &Activity) {
-        let presence_json = build_presence_update(PresenceStatus::Online, &[activity.clone()]);
+        let presence_json = build_presence_update(PresenceStatus::Online, std::slice::from_ref(activity));
         self.state.send_presence(presence_json.to_string());
     }
 
     /// Check if an activity is "empty" (no meaningful content).
     /// An empty activity has no name (or default name), no state, no details,
     /// no assets, and no timestamps.
-    fn is_activity_empty(activity: &Activity) -> bool {
+    const fn is_activity_empty(activity: &Activity) -> bool {
         activity.name.is_empty()
             && activity.state.is_none()
             && activity.details.is_none()
@@ -77,7 +77,7 @@ impl DiscordRpcClient {
     }
 
     /// Store the activity and optionally send it if the gateway is ready.
-    fn store_and_send_activity(&self, activity: Activity) {
+    fn store_and_send_activity(&self, activity: &Activity) {
         {
             let mut current = self.current_activity.lock().unwrap();
             *current = Some(activity.clone());
@@ -85,7 +85,7 @@ impl DiscordRpcClient {
 
         if self.state.ready.load(Ordering::SeqCst) {
             debug!("client: sending presence update via set_activity");
-            self.send_activity_inner(&activity);
+            self.send_activity_inner(activity);
         } else {
             debug!("client: activity stored (not yet connected)");
         }
@@ -99,9 +99,17 @@ impl DiscordRpcClient {
     /// If the client is already connected (after `start_activity()`), the
     /// activity is sent immediately via the Gateway. Otherwise it is stored
     /// and will be sent when `start_activity()` is called.
-    pub fn set_activity(&self, activity: Activity) -> Result<(), Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the token lock is poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
+    pub fn set_activity(&self, activity: &Activity) -> Result<(), Error> {
         // If the activity is empty (default), clear the display
-        if Self::is_activity_empty(&activity) {
+        if Self::is_activity_empty(activity) {
             self.clear_activity();
             return Ok(());
         }
@@ -110,14 +118,14 @@ impl DiscordRpcClient {
 
         // Resolve external images now, so we don't need to re-resolve later
         let resolved_activity = resolve_activity_images(
-            &activity,
+            activity,
             &self.app_id,
             &token,
             &self.asset_resolver,
         );
 
         debug!("Resolved large image : Large : {:?} Small : {:?}", resolved_activity.assets().large_image(), resolved_activity.assets().small_image());
-        self.store_and_send_activity(resolved_activity);
+        self.store_and_send_activity(&resolved_activity);
         Ok(())
     }
 
@@ -125,6 +133,15 @@ impl DiscordRpcClient {
     ///
     /// This establishes a WebSocket connection to Discord, identifies the
     /// client, and sends the current presence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the token lock is poisoned, the gateway times out,
+    /// the token is invalid, or a network error occurs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     pub fn start_activity(&self) -> Result<(), Error> {
         let state = self.state.clone();
         let app_id = self.app_id.clone();
@@ -174,7 +191,7 @@ impl DiscordRpcClient {
                             _ => {}
                         }
                     }
-                    _ = tokio::time::sleep(std::time::Duration::from_secs(15)) => {
+                    () = tokio::time::sleep(std::time::Duration::from_secs(15)) => {
                         return Err(Error::Network(
                             "Timed out waiting for gateway READY (15s) - check your internet connection".to_string(),
                         ));
@@ -198,10 +215,14 @@ impl DiscordRpcClient {
             .block_on(async { self.state.user_name.lock().await.clone() })
     }
 
-    /// Update the OAuth2 token used by this client.
+    /// Update the `OAuth2` token used by this client.
     /// Useful for token refresh without needing to recreate the client.
     /// The gateway task already has its own copy; this ensures future
     /// identify/resume attempts use the new token.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     pub fn set_token(&self, new_token: &str) {
         let mut token = self.token.lock().unwrap();
         *token = new_token.to_string();
@@ -212,6 +233,14 @@ impl DiscordRpcClient {
     ///
     /// This sends an empty presence update (clears the activity) and
     /// closes the WebSocket connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the activity is already stopped.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned.
     pub fn stop_activity(&self) -> Result<(), Error> {
         info!("client: stopping activity");
 
@@ -269,9 +298,9 @@ fn resolve_activity_images(
     token: &str,
     resolver: &ExternalAssetsResolver,
 ) -> Activity {
-    let mut resolved = activity.clone();
+    let mut resolved_activity = activity.clone();
 
-    if let Some(assets) = resolved.assets.as_mut() {
+    if let Some(assets) = resolved_activity.assets.as_mut() {
         resolve_single_image(
             &mut assets.large_image,
             &mut assets.large_image_external,
@@ -288,5 +317,5 @@ fn resolve_activity_images(
         );
     }
 
-    resolved
+    resolved_activity
 }

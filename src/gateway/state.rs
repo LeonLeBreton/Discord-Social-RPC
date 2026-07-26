@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, watch, Mutex};
 use crate::status::ActivityStatus;
 
 /// Shared state between the gateway task and `DiscordRpcClient`.
-pub(crate) struct GatewayState {
+pub struct GatewayState {
     pub status_tx: watch::Sender<ActivityStatus>,
     pub status_rx: watch::Receiver<ActivityStatus>,
 
@@ -47,7 +47,7 @@ impl GatewayState {
         let _ = self.status_tx.send(status);
     }
 
-    pub async fn set_async(&self, status: ActivityStatus) {
+    pub fn set_async(&self, status: ActivityStatus) {
         let _ = self.status_tx.send(status);
     }
 

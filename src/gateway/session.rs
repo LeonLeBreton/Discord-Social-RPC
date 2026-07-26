@@ -30,7 +30,7 @@ type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 type WsWriter = SplitSink<WsStream, Message>;
 type WsReader = SplitStream<WsStream>;
 
-pub(crate) async fn run_gateway(state: Arc<GatewayState>, app_id: String, token: String) {
+pub async fn run_gateway(state: Arc<GatewayState>, app_id: String, token: String) {
     let mut attempts = 0u32;
 
     loop {
@@ -41,17 +41,13 @@ pub(crate) async fn run_gateway(state: Arc<GatewayState>, app_id: String, token:
         info!("gateway: connecting (attempt {})", attempts + 1);
 
         match run_session(&state, &app_id, &token).await {
-            SessionResult::Stop => {
-                state.set_async(ActivityStatus::Stopped).await;
-                break;
-            }
             SessionResult::Reconnect => {
                 if !should_reconnect(&mut attempts, &state).await {
                     break;
                 }
             }
-            SessionResult::Fatal => {
-                state.set_async(ActivityStatus::Stopped).await;
+            SessionResult::Stop | SessionResult::Fatal => {
+                state.set_async(ActivityStatus::Stopped);
                 break;
             }
         }
@@ -74,12 +70,12 @@ async fn run_session(
         Ok(r) => r,
         Err(e) => {
             warn!("gateway: connection to {url} failed: {e}");
-            state.set_async(ActivityStatus::NetworkError).await;
+            state.set_async(ActivityStatus::NetworkError);
             return SessionResult::Reconnect;
         }
     };
 
-    state.set_async(ActivityStatus::Disconnected).await;
+    state.set_async(ActivityStatus::Disconnected);
     let (mut write, mut read) = ws.split();
 
     let hb_interval = match wait_for_hello(&mut read, state).await {
@@ -234,7 +230,7 @@ async fn handle_ws_message(
             Event::Continue => {}
             Event::Ready | Event::Resumed => {
                 state.ready.store(true, Ordering::SeqCst);
-                state.set_async(ActivityStatus::Ok).await;
+                state.set_async(ActivityStatus::Ok);
             }
             Event::HeartbeatAck => {
                 *missed_acks = 0;
@@ -256,7 +252,6 @@ async fn handle_ws_message(
         Message::Ping(d) => {
             let _ = write.send(Message::Pong(d)).await;
         }
-        Message::Pong(_) => {}
         _ => {} // Binary / other
     }
     Ok(())
@@ -264,7 +259,7 @@ async fn handle_ws_message(
 
 /// Handle a close frame, shared between pre-hello and in-session contexts.
 /// When `before_hello` is true, returns `SessionResult` directly.
-/// When `before_hello` is false, returns `Result<(), SessionResult>` for use in handle_ws_message.
+/// When `before_hello` is false, returns `Result<(), SessionResult>` for use in `handle_ws_message`.
 async fn handle_close_frame(
     frame: Option<CloseFrame>,
     before_hello: bool,
@@ -279,7 +274,7 @@ async fn handle_close_frame(
 
     match code {
         4004 => {
-            state.set_async(ActivityStatus::TokenInvalid).await;
+            state.set_async(ActivityStatus::TokenInvalid);
             SessionResult::Fatal
         }
         4009 if !before_hello => {
@@ -323,7 +318,7 @@ async fn should_reconnect(attempts: &mut u32, state: &Arc<GatewayState>) -> bool
     }
     if *attempts >= MAX_RECONNECT_ATTEMPTS {
         warn!("gateway: max reconnect attempts ({MAX_RECONNECT_ATTEMPTS}) reached");
-        state.set_async(ActivityStatus::NetworkError).await;
+        state.set_async(ActivityStatus::NetworkError);
         return false;
     }
     *attempts += 1;
@@ -348,6 +343,6 @@ fn jitter_ms(base: u64) -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .subsec_nanos();
-    let frac = (nanos ^ (nanos << 10) ^ (nanos >> 5)) as u64 % base;
+    let frac = u64::from(nanos ^ (nanos << 10) ^ (nanos >> 5)) % base;
     base / 2 + frac
 }

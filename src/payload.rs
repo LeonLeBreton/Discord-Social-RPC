@@ -5,7 +5,7 @@ use crate::presence::PresenceStatus;
 // --- Internal payload types ---
 
 #[derive(Serialize)]
-pub(crate) struct PresenceUpdatePayload {
+pub struct PresenceUpdatePayload {
     pub since: u64,
     pub activities: Vec<ActivityPayload>,
     pub status: String,
@@ -13,7 +13,7 @@ pub(crate) struct PresenceUpdatePayload {
 }
 
 #[derive(Serialize)]
-pub(crate) struct ActivityPayload {
+pub struct ActivityPayload {
     pub name: String,
     #[serde(rename = "type")]
     pub activity_type: u32,
@@ -28,7 +28,7 @@ pub(crate) struct ActivityPayload {
 }
 
 #[derive(Serialize)]
-pub(crate) struct TimestampPayload {
+pub struct TimestampPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -36,7 +36,7 @@ pub(crate) struct TimestampPayload {
 }
 
 #[derive(Serialize)]
-pub(crate) struct AssetsPayload {
+pub struct AssetsPayload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub large_image: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -50,7 +50,7 @@ pub(crate) struct AssetsPayload {
 // --- Builder functions ---
 
 /// Build a PRESENCE UPDATE (Gateway op 3) payload.
-pub(crate) fn build_presence_update(
+pub fn build_presence_update(
     status: PresenceStatus,
     activities: &[Activity],
 ) -> serde_json::Value {
@@ -66,7 +66,7 @@ pub(crate) fn build_presence_update(
 }
 
 /// Build an IDENTIFY frame (Gateway op 2).
-pub(crate) fn build_identify_frame(app_id: &str, token: &str) -> serde_json::Value {
+pub fn build_identify_frame(app_id: &str, token: &str) -> serde_json::Value {
     let bearer = ensure_bearer(token);
     serde_json::json!({
         "op": 2,
@@ -84,12 +84,12 @@ pub(crate) fn build_identify_frame(app_id: &str, token: &str) -> serde_json::Val
 }
 
 /// Build a heartbeat frame (Gateway op 1).
-pub(crate) fn build_heartbeat_frame(seq: Option<u64>) -> serde_json::Value {
+pub fn build_heartbeat_frame(seq: Option<u64>) -> serde_json::Value {
     serde_json::json!({ "op": 1, "d": seq })
 }
 
 /// Build a RESUME frame (Gateway op 6).
-pub(crate) fn build_resume_frame(
+pub fn build_resume_frame(
     token: &str,
     session_id: &str,
     seq: u64,
@@ -111,13 +111,13 @@ fn ensure_bearer(token: &str) -> String {
     if token.starts_with("Bearer ") {
         token.to_string()
     } else {
-        format!("Bearer {}", token)
+        format!("Bearer {token}")
     }
 }
 
 fn activity_to_payload(activity: &Activity) -> ActivityPayload {
     let name = if activity.name.is_empty() {
-        match activity.activity_type {
+        match activity.activity_type() {
             crate::ActivityType::Playing => "Playing",
             crate::ActivityType::Listening => "Listening",
             crate::ActivityType::Watching => "Watching",
@@ -130,7 +130,7 @@ fn activity_to_payload(activity: &Activity) -> ActivityPayload {
 
     ActivityPayload {
         name,
-        activity_type: activity.activity_type.code(),
+        activity_type: activity.activity_type().code(),
         state: activity.state.clone(),
         details: activity.details.clone(),
         timestamps: activity.timestamps.as_ref().map(|ts| TimestampPayload {
