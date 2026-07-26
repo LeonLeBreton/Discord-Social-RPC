@@ -21,7 +21,7 @@ pub struct DiscordRpcClient {
     runtime: Arc<Runtime>,
     state: Arc<GatewayState>,
     current_activity: std::sync::Mutex<Option<Activity>>,
-    asset_resolver: ExternalAssetsResolver,
+    asset_resolver: Arc<ExternalAssetsResolver>,
 }
 
 impl DiscordRpcClient {
@@ -32,7 +32,7 @@ impl DiscordRpcClient {
         runtime: Arc<Runtime>,
         state: Arc<GatewayState>,
         current_activity: std::sync::Mutex<Option<Activity>>,
-        asset_resolver: ExternalAssetsResolver,
+        asset_resolver: Arc<ExternalAssetsResolver>,
     ) -> Self {
         Self {
             app_id,

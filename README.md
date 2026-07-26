@@ -117,6 +117,7 @@ let client = DiscordSocialRpc::new("your_app_id")?;
 | Method | Description |
 |--------|-------------|
 | `new(app_id)` | Create a new instance with the given Discord Application ID. |
+| `new_custom_cached(app_id, cache_capacity, cache_evict_batch)` | Create a new instance with a custom external assets cache size and eviction batch. |
 | `create_new_client(oauth2_token)` | Validate the token format and create a `DiscordRpcClient`. Does **not** connect yet. |
 
 ### `DiscordSocialRpcAdmin`
@@ -130,6 +131,7 @@ let admin = DiscordSocialRpcAdmin::new("your_client_id", "your_client_secret")?;
 | Method | Description |
 |--------|-------------|
 | `new(client_id, client_secret)` | Create a new admin instance with the given Discord client ID and client secret. Also creates the internal `DiscordSocialRpc`. |
+| `new_custom_cached(client_id, client_secret, cache_capacity, cache_evict_batch)` | Same as `new()` but with a custom external assets cache size and eviction batch. |
 | `refresh_user_token(refresh_token)` | Refresh a user's OAuth2 access token using the refresh token. Returns a `TokenRefreshResponse`. Synchronous — uses the internal runtime. |
 | `exchange_code(code, redirect_uri)` | Exchange an OAuth2 authorization code for access and refresh tokens. Returns a `CodeExchangeResponse`. Synchronous — uses the internal runtime. |
 | `rpc()` | Return a reference to the underlying `DiscordSocialRpc` for creating clients, setting activities, etc. |
@@ -276,8 +278,10 @@ When you pass an image URL (not starting with `mp:`) to `Assets::large_image()` 
 
 1. Checks its internal cache for a previously resolved `mp:` path.
 2. If not cached, calls `POST /api/v9/applications/{app_id}/external-assets` with the URL.
-3. Stores the resolved `mp:` path in the cache (max 128 entries, with LRU eviction).
+3. Stores the resolved `mp:` path in the cache (default 4096 entries, with LRU eviction).
 4. Uses the resolved path in the Gateway presence update.
+
+The cache is shared across all clients created from the same `DiscordSocialRpc` instance, so resolving an image once benefits all users. You can configure the cache size and eviction batch with `new_custom_cached()`.
 
 This happens automatically during `set_activity()` and `start_activity()` — no manual steps required.
 

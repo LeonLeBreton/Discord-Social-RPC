@@ -16,6 +16,7 @@ use crate::utils::{self, TokenRefreshResponse, CodeExchangeResponse};
 pub struct DiscordSocialRpc {
     pub(crate) app_id: String,
     pub(crate) runtime: Arc<Runtime>,
+    asset_resolver: Arc<ExternalAssetsResolver>,
 }
 
 impl DiscordSocialRpc {
@@ -28,6 +29,18 @@ impl DiscordSocialRpc {
         Ok(Self {
             app_id,
             runtime: Arc::new(runtime),
+            asset_resolver: Arc::new(ExternalAssetsResolver::default()),
+        })
+    }
+
+    pub fn new_custom_cached(app_id: &str, cache_capacity: usize, cache_evict_batch: usize) -> Result<Self, Error> {
+        let app_id = app_id.to_string();
+        let runtime = Runtime::new().map_err(|e| Error::Runtime(e.to_string()))?;
+
+        Ok(Self {
+            app_id,
+            runtime: Arc::new(runtime),
+            asset_resolver: Arc::new(ExternalAssetsResolver::new(cache_capacity, cache_evict_batch)),
         })
     }
 
@@ -63,7 +76,7 @@ impl DiscordSocialRpc {
             self.runtime.clone(),
             state,
             std::sync::Mutex::new(None),
-            ExternalAssetsResolver::new(),
+            self.asset_resolver.clone(),
         ))
     }
 }
@@ -84,6 +97,15 @@ impl DiscordSocialRpcAdmin {
     /// Also creates the internal DiscordSocialRpc (which needs client_id = app_id).
     pub fn new(client_id: &str, client_secret: &str) -> Result<Self, Error> {
         let rpc = DiscordSocialRpc::new(client_id)?;
+        Ok(Self {
+            client_id: client_id.to_string(),
+            client_secret: client_secret.to_string(),
+            rpc,
+        })
+    }
+
+    pub fn new_custom_cached(client_id: &str, client_secret: &str, cache_capacity: usize, cache_evict_batch: usize) -> Result<Self, Error> {
+        let rpc = DiscordSocialRpc::new_custom_cached(client_id, cache_capacity, cache_evict_batch)?;
         Ok(Self {
             client_id: client_id.to_string(),
             client_secret: client_secret.to_string(),
