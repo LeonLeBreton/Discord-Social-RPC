@@ -18,7 +18,7 @@
 //!         .set_state("Playing Rust")
 //!         .set_details("Building a library")
 //!         .set_activity_type(ActivityType::Listening)
-//!         .set_assets(Assets::new().large_image("mp:rust_logo"))
+//!         .set_assets(Assets::new().set_large_image("https://example.com/banner.png"))
 //! ).unwrap();
 //!
 //! rpc.start_activity().unwrap();

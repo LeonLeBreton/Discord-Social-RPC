@@ -180,7 +180,7 @@ let activity = Activity::new()
     .state("Doing something")
     .details("In the menu")
     .activity_type(ActivityType::Playing)
-    .assets(Assets::new().large_image("mp:my_asset"))
+    .assets(Assets::new().large_image("https://example.com/banner.png"))
     .timestamps(Timestamps::new().start(1234567890000));
 ```
 
@@ -207,14 +207,14 @@ let activity = Activity::new()
 
 Images for the activity. Images can be:
 
-- **Pre-registered** — use `mp:your_image_name` (assets uploaded to Discord Developer Portal).
-- **External URL** — pass a full URL like `https://example.com/image.png`. The library automatically resolves it to an `mp:` path via Discord's external assets API.
+- **External URL** — pass a full URL like `https://example.com/banner.png`. The library automatically resolves it to an `mp:external/{hash}` path via Discord's external assets API.
+- **Already resolved** — if you already have an `mp:external/{hash}` path (from a previous resolution), you can pass it directly to reuse it without an API call.
 
 ```rust,no_run
 let assets = Assets::new()
-    .large_image("mp:official_logo")    // pre-registered asset
+    .large_image("https://example.com/banner.png")    // external URL, auto-resolved
     .large_text("My App Logo")
-    .small_image("https://example.com/icon.png")  // auto-resolved
+    .small_image("https://example.com/icon.png")       // auto-resolved
     .small_text("Status icon");
 ```
 
@@ -306,7 +306,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .activity_type(ActivityType::Playing)
         .assets(
             Assets::new()
-                .large_image("mp:app_logo")
+                .large_image("https://example.com/banner.png")
                 .large_text("My App"),
         )
         .timestamps(

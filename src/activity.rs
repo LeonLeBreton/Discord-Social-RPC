@@ -53,8 +53,8 @@ impl Timestamps {
 /// Assets (images) for a Discord activity.
 ///
 /// Images can be either:
-/// - **Pre-registered**: Use `large_image("mp:your_image_name")`
-/// - **External URL**: Use `large_image("https://...")` — resolved automatically
+/// - **External URL**: Use `large_image("https://...")` — resolved automatically via Discord's external assets API to an `mp:external/{hash}` path
+/// - **Already resolved**: Use `large_image("mp:external/{hash}")` — if you already have a resolved path from a previous call
 #[derive(Debug, Clone, Default)]
 pub struct Assets {
     pub(crate) large_image: Option<String>,
@@ -71,7 +71,7 @@ impl Assets {
     }
 
     /// Set the large image. If the key starts with `mp:` it's treated as
-    /// a pre-registered asset; otherwise it's resolved as an external URL.
+    /// an already-resolved path (e.g. `mp:external/{hash}`); otherwise it's resolved via Discord's external assets API.
     pub fn set_large_image(mut self, key: &str) -> Self {
         self.large_image = Some(key.to_string());
         self.large_image_external = !key.starts_with("mp:");
@@ -84,7 +84,7 @@ impl Assets {
         self
     }
 
-    /// Set the small image. See `large_image` for URL handling.
+    /// Set the small image. Same behavior as `set_large_image`.
     pub fn set_small_image(mut self, key: &str) -> Self {
         self.small_image = Some(key.to_string());
         self.small_image_external = !key.starts_with("mp:");
@@ -122,11 +122,11 @@ impl Assets {
 /// use discord_social_rpc::{Activity, ActivityType, Assets, Timestamps};
 ///
 /// let activity = Activity::new()
-///     .state("Playing Rust")
-///     .details("Building a library")
-///     .activity_type(ActivityType::Listening)
-///     .assets(Assets::new().large_image("mp:rust_logo"))
-///     .timestamps(Timestamps::new().start(1234567890000));
+///     .set_state("Playing Rust")
+///     .set_details("Building a library")
+///     .set_activity_type(ActivityType::Listening)
+///     .set_assets(Assets::new().set_large_image("https://example.com/rust_logo.png"))
+///     .set_timestamps(Timestamps::new().set_start(1234567890000));
 /// ```
 #[derive(Debug, Clone, Default)]
 pub struct Activity {
